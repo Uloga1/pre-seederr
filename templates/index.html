@@ -74,24 +74,28 @@
                                         <td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
                                         <td class="text-truncate" style="max-width: 300px;" title="{{ .Title }}">{{ .Title }}</td>
                                         <td>{{ printf "%.2f" .SizeMB }} MB</td>
-                                        <td>
-											<div class="d-flex gap-2">
-												<form action="data:application/x-bittorrent;base64,{{ $res.EncodedTorrentA }}" method="get">
-													<button type="submit" class="btn btn-sm btn-outline-secondary">Download .torrent</button>
-												</form>
+                                        <td class="pe-3">
+											<div class="d-flex align-items-center gap-2">
+												<a href="data:application/x-bittorrent;base64,{{ $res.EncodedTorrentA }}" 
+												   download="{{ .FileName }}" 
+												   class="btn btn-sm btn-outline-secondary text-nowrap">
+												   Download
+												</a>
 
-												<form action="/inject" method="POST" class="d-inline">
+												<form action="/inject" method="POST" class="d-inline flex-grow-1">
 													<input type="hidden" name="download_url" value="{{ .DownloadURL }}">
 													<input type="hidden" name="torrent_data" value="{{ $res.EncodedTorrentA }}">
 													
-													<div class="input-group input-group-sm">
+													<div class="input-group input-group-sm" style="min-width: 200px;">
 														{{ if $top.Categories }}
 														<select name="category" class="form-select">
 															<option value="">Category...</option>
-															{{ range $top.Categories }}<option value="{{ . }}">{{ . }}</option>{{ end }}
+															{{ range $top.Categories }}
+															<option value="{{ . }}">{{ . }}</option>
+															{{ end }}
 														</select>
 														{{ end }}
-														<button type="submit" class="btn btn-primary">Inject Both</button>
+														<button type="submit" class="btn btn-primary text-nowrap">Inject Both</button>
 													</div>
 												</form>
 											</div>
