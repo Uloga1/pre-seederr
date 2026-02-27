@@ -105,6 +105,7 @@ type PageData struct {
 }
 
 func main() {
+	http.DefaultClient.Timeout = 5 * time.Second
 	loadConfig()
 
 	http.HandleFunc("/", handleIndex)
