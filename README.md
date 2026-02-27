@@ -23,7 +23,7 @@ docker run -d \
   --restart unless-stopped \
   -p 5000:5000 \
   -v /path/to/your/appdata/preseeder/data:/app/data \
-  ghcr.io/YOUR_GITHUB_USERNAME/pre-seeder:latest
+  ghcr.io/Uloga1/pre-seederr:latest
   
   ```
   (Note: Replace /path/to/your/appdata/preseeder/data with your actual Docker appdata path to ensure your settings survive container restarts).
