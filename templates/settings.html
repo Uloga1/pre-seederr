@@ -19,12 +19,13 @@
     <div class="container pb-5">
         <h3 class="mb-4">Configuration</h3>
         
-        {{ if .Success }}<div class="alert alert-success fw-bold">{{ .Success }}</div>{{ end }}
-        {{ if .Error }}<div class="alert alert-danger fw-bold">{{ .Error }}</div>{{ end }}
+        {{ if .GlobalSuccess }}<div class="alert alert-success fw-bold">{{ .GlobalSuccess }}</div>{{ end }}
+        {{ if .GlobalError }}<div class="alert alert-danger fw-bold">{{ .GlobalError }}</div>{{ end }}
 
         <div class="card shadow-sm">
             <div class="card-body">
                 <form method="POST">
+                    <h5 class="mb-3">Prowlarr Configuration</h5>
                     <div class="mb-3">
                         <label class="form-label">Prowlarr URL</label>
                         <input type="text" class="form-control" name="prowlarr_url" id="prowlarr_url" value="{{ .Config.ProwlarrURL }}" required>
@@ -59,10 +60,21 @@
                             <span id="qbit-status" class="ms-2 fw-bold"></span>
                         </div>
                     </div>
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <label class="form-label">Default Save Path</label>
                         <input type="text" class="form-control" name="qbit_save_path" value="{{ .Config.QbitSavePath }}" required>
                     </div>
+                    <div class="mb-4">
+                        <label class="form-label">Categories (Comma separated)</label>
+                        <input type="text" class="form-control" name="qbit_categories" value="{{ .Config.QbitCategories }}">
+                        <div class="form-text">e.g. movies, tv, cross-seed. These will appear as a dropdown when injecting.</div>
+                    </div>
+                    <div class="mb-4 form-check bg-white p-3 rounded border shadow-sm">
+                        <input type="checkbox" class="form-check-input ms-1" id="qbit_skip_checking" name="qbit_skip_checking" {{ if .Config.QbitSkipChecking }}checked{{ end }}>
+                        <label class="form-check-label ms-2 fw-bold" for="qbit_skip_checking">Skip Hash Check for Pre-Seeds</label>
+                        <div class="form-text ms-2 mt-1">If enabled, Tracker A will be injected in a "100% Complete" state. When Tracker B finishes downloading, simply unpause Tracker A to begin seeding instantly without verifying files.</div>
+                    </div>
+
                     <button type="submit" class="btn btn-success">Save Settings</button>
                 </form>
             </div>

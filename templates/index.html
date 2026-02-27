@@ -72,9 +72,21 @@
                                         <td>{{ printf "%.2f" .SizeDiffMB }} MB</td>
                                         <td>
                                             <form action="/inject" method="POST" class="d-inline">
+                                                <form action="/inject" method="POST" class="d-inline">
                                                 <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
                                                 <input type="hidden" name="torrent_data" value="{{ $.EncodedTorrentA }}">
-                                                <button type="submit" class="btn btn-sm btn-primary">Inject Both</button>
+                                                <div class="input-group input-group-sm">
+                                                    {{ if $.Categories }}
+                                                    <select name="category" class="form-select" style="max-width: 140px;">
+                                                        <option value="">No Category</option>
+                                                        {{ range $.Categories }}
+                                                        <option value="{{ . }}">{{ . }}</option>
+                                                        {{ end }}
+                                                    </select>
+                                                    {{ end }}
+                                                    <button type="submit" class="btn btn-primary">Inject Both</button>
+                                                </div>
+                                            </form>
                                             </form>
                                         </td>
                                     </tr>

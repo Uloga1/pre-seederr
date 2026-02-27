@@ -24,19 +24,21 @@ const (
 	ConfigPath = "data/config.json"
 )
 
-// Global HTTP Client with a strict timeout so the app never hangs
 var httpClient = &http.Client{
 	Timeout: 15 * time.Second,
 }
 
+// Added Categories and SkipChecking to Config
 type Config struct {
-	ProwlarrURL     string  `json:"prowlarr_url"`
-	ProwlarrAPIKey  string  `json:"prowlarr_api_key"`
-	SizeToleranceMB float64 `json:"size_tolerance_mb"`
-	QbitURL         string  `json:"qbit_url"`
-	QbitUser        string  `json:"qbit_user"`
-	QbitPass        string  `json:"qbit_pass"`
-	QbitSavePath    string  `json:"qbit_save_path"`
+	ProwlarrURL      string  `json:"prowlarr_url"`
+	ProwlarrAPIKey   string  `json:"prowlarr_api_key"`
+	SizeToleranceMB  float64 `json:"size_tolerance_mb"`
+	QbitURL          string  `json:"qbit_url"`
+	QbitUser         string  `json:"qbit_user"`
+	QbitPass         string  `json:"qbit_pass"`
+	QbitSavePath     string  `json:"qbit_save_path"`
+	QbitCategories   string  `json:"qbit_categories"`
+	QbitSkipChecking bool    `json:"qbit_skip_checking"`
 }
 
 var AppConfig Config
@@ -46,13 +48,15 @@ func loadConfig() {
 	file, err := os.ReadFile(ConfigPath)
 	if err != nil {
 		AppConfig = Config{
-			ProwlarrURL:     "http://192.168.1.100:9696",
-			ProwlarrAPIKey:  "",
-			SizeToleranceMB: 5.0,
-			QbitURL:         "http://192.168.1.100:8080",
-			QbitUser:        "admin",
-			QbitPass:        "adminadmin",
-			QbitSavePath:    "/downloads/pre-seeds",
+			ProwlarrURL:      "http://192.168.1.100:9696",
+			ProwlarrAPIKey:   "",
+			SizeToleranceMB:  5.0,
+			QbitURL:          "http://192.168.1.100:8080",
+			QbitUser:         "admin",
+			QbitPass:         "adminadmin",
+			QbitSavePath:     "/downloads/pre-seeds",
+			QbitCategories:   "movies, tv, music",
+			QbitSkipChecking: false,
 		}
 		saveConfig()
 		return
@@ -83,7 +87,6 @@ type Match struct {
 	SizeDiffMB  float64
 }
 
-// New struct to hold results for EACH file uploaded
 type TorrentResult struct {
 	FileName        string
 	Name            string
@@ -98,6 +101,7 @@ type PageData struct {
 	GlobalSuccess string
 	Results       []TorrentResult
 	Config        Config
+	Categories    []string // Used to build the dropdown
 }
 
 func main() {
@@ -113,16 +117,13 @@ func main() {
 	http.ListenAndServe(Port, nil)
 }
 
-// --- Test Connection Handlers (Now using httpClient) ---
 func handleTestProwlarr(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		return
 	}
 	testURL := fmt.Sprintf("%s/api/v1/system/status?apikey=%s", r.FormValue("prowlarr_url"), r.FormValue("prowlarr_api_key"))
-	
 	req, _ := http.NewRequest("GET", testURL, nil)
 	resp, err := httpClient.Do(req)
-	
 	if err != nil || resp.StatusCode != 200 {
 		http.Error(w, "Failed", http.StatusBadRequest)
 		return
@@ -136,10 +137,8 @@ func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := url.Values{"username": {r.FormValue("qbit_user")}, "password": {r.FormValue("qbit_pass")}}
-	
 	req, _ := http.NewRequest("POST", r.FormValue("qbit_url")+"/api/v2/auth/login", strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		http.Error(w, "Failed", http.StatusBadRequest)
@@ -155,12 +154,10 @@ func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// --- qBittorrent API Logic (Now using httpClient) ---
 func qbitLogin() (*http.Cookie, error) {
 	data := url.Values{"username": {AppConfig.QbitUser}, "password": {AppConfig.QbitPass}}
 	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/auth/login", strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -175,11 +172,16 @@ func qbitLogin() (*http.Cookie, error) {
 	return nil, fmt.Errorf("authentication failed")
 }
 
-func qbitAddURL(cookie *http.Cookie, dlURL string) error {
+// Added category parameter. Skip checking is always false for Tracker B.
+func qbitAddURL(cookie *http.Cookie, dlURL string, category string) error {
 	data := url.Values{
 		"urls":     {dlURL},
 		"savepath": {AppConfig.QbitSavePath},
 	}
+	if category != "" {
+		data.Set("category", category)
+	}
+
 	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/torrents/add", strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(cookie)
@@ -189,14 +191,14 @@ func qbitAddURL(cookie *http.Cookie, dlURL string) error {
 		return err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("qBit URL inject status %d", resp.StatusCode)
 	}
 	return nil
 }
 
-func qbitAddFile(cookie *http.Cookie, fileBytes []byte) error {
+// Added category and skip_checking parameters for Tracker A
+func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string) error {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
@@ -204,6 +206,14 @@ func qbitAddFile(cookie *http.Cookie, fileBytes []byte) error {
 	part.Write(fileBytes)
 	writer.WriteField("savepath", AppConfig.QbitSavePath)
 	writer.WriteField("paused", "true")
+	
+	if AppConfig.QbitSkipChecking {
+		writer.WriteField("skip_checking", "true")
+	}
+
+	if category != "" {
+		writer.WriteField("category", category)
+	}
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/torrents/add", body)
@@ -215,14 +225,12 @@ func qbitAddFile(cookie *http.Cookie, fileBytes []byte) error {
 		return err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("qBit File inject status %d", resp.StatusCode)
 	}
 	return nil
 }
 
-// --- Handlers ---
 func handleInject(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -231,6 +239,7 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 
 	dlURL := r.FormValue("download_url")
 	b64Torrent := r.FormValue("torrent_data")
+	category := r.FormValue("category") // Get category from dropdown
 	
 	torrentBytes, err := base64.StdEncoding.DecodeString(b64Torrent)
 	if err != nil {
@@ -244,17 +253,17 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = qbitAddURL(cookie, dlURL); err != nil {
+	if err = qbitAddURL(cookie, dlURL, category); err != nil {
 		http.Redirect(w, r, "/?err="+url.QueryEscape("Failed injecting Tracker B: "+err.Error()), http.StatusSeeOther)
 		return
 	}
 
-	if err = qbitAddFile(cookie, torrentBytes); err != nil {
+	if err = qbitAddFile(cookie, torrentBytes, category); err != nil {
 		http.Redirect(w, r, "/?err="+url.QueryEscape("Tracker B started, but failed injecting Tracker A: "+err.Error()), http.StatusSeeOther)
 		return
 	}
 
-	http.Redirect(w, r, "/?msg="+url.QueryEscape("Success! Tracker B is downloading, Tracker A is paused."), http.StatusSeeOther)
+	http.Redirect(w, r, "/?msg="+url.QueryEscape("Success! Torrents injected into qBittorrent."), http.StatusSeeOther)
 }
 
 func handleSettings(w http.ResponseWriter, r *http.Request) {
@@ -266,10 +275,15 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		AppConfig.ProwlarrURL = r.FormValue("prowlarr_url")
 		AppConfig.ProwlarrAPIKey = r.FormValue("prowlarr_api_key")
 		fmt.Sscanf(r.FormValue("size_tolerance_mb"), "%f", &AppConfig.SizeToleranceMB)
+		
 		AppConfig.QbitURL = r.FormValue("qbit_url")
 		AppConfig.QbitUser = r.FormValue("qbit_user")
 		AppConfig.QbitPass = r.FormValue("qbit_pass")
 		AppConfig.QbitSavePath = r.FormValue("qbit_save_path")
+		AppConfig.QbitCategories = r.FormValue("qbit_categories")
+		
+		// Checkboxes only send data if they are checked
+		AppConfig.QbitSkipChecking = r.FormValue("qbit_skip_checking") == "on"
 
 		if err := saveConfig(); err != nil {
 			data.GlobalError = "Failed to save settings."
@@ -285,6 +299,18 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
 	data := PageData{}
 
+	// Parse categories for the dropdown
+	var catList []string
+	if AppConfig.QbitCategories != "" {
+		for _, cat := range strings.Split(AppConfig.QbitCategories, ",") {
+			cleaned := strings.TrimSpace(cat)
+			if cleaned != "" {
+				catList = append(catList, cleaned)
+			}
+		}
+	}
+	data.Categories = catList
+
 	if msg := r.URL.Query().Get("msg"); msg != "" {
 		data.GlobalSuccess = msg
 	}
@@ -293,7 +319,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodPost {
-		// Parse bulk upload (max 50MB total)
 		err := r.ParseMultipartForm(50 << 20)
 		if err != nil {
 			data.GlobalError = "Failed to parse uploaded files."
@@ -304,10 +329,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		files := r.MultipartForm.File["torrent_files"]
 		var results []TorrentResult
 
-		// Loop through every file uploaded
 		for _, fileHeader := range files {
 			res := TorrentResult{FileName: fileHeader.Filename}
-			
 			file, err := fileHeader.Open()
 			if err != nil {
 				res.Error = "Failed to read file."
@@ -319,7 +342,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			file.Close()
 
 			res.EncodedTorrentA = base64.StdEncoding.EncodeToString(fileBytes)
-
 			name, targetSize, err := parseTorrent(fileBytes)
 			if err != nil {
 				res.Error = "Invalid .torrent file."
@@ -345,7 +367,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, data)
 }
 
-// ... parseTorrent and findBestMatches remain exactly the same ...
 func parseTorrent(data []byte) (string, int64, error) {
 	reader := bytes.NewReader(data)
 	decoded, err := bencode.Decode(reader)
@@ -376,7 +397,6 @@ func parseTorrent(data []byte) (string, int64, error) {
 func searchProwlarr(query string) ([]ProwlarrResult, error) {
 	url := fmt.Sprintf("%s/api/v1/search?query=%s&type=search&apikey=%s", AppConfig.ProwlarrURL, url.QueryEscape(query), AppConfig.ProwlarrAPIKey)
 	req, _ := http.NewRequest("GET", url, nil)
-	
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
