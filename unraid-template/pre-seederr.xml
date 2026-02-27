@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Pre-Seederr</Name>
+  <Repository>ghcr.io/uloga1/pre-seederr:latest</Repository>
+  <Registry>https://github.com/Uloga1/pre-seederr/pkgs/container/pre-seederr</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Uloga1/pre-seederr/issues</Support>
+  <Project>https://github.com/Uloga1/pre-seederr</Project>
+  <Overview>A lightweight web application written in Go that automates Reverse Cross-Seeding. Upload a target .torrent file, and the app will automatically search Prowlarr for matching releases by file size and instantly inject both the active download and a paused payload into qBittorrent simultaneously.</Overview>
+  <Category>Downloaders: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:5000]</WebUI>
+  <Icon>https://raw.githubusercontent.com/Uloga1/pre-seederr/main/icon.png</Icon>
+  
+  <Config Name="WebUI Port" Target="5000" Default="5000" Mode="tcp" Description="The port the web interface will run on." Type="Port" Display="always" Required="true" Mask="false">5000</Config>
+  
+  <Config Name="Config Data" Target="/app/data" Default="/mnt/user/appdata/pre-seederr/data" Mode="rw" Description="Where the config.json settings file will be saved." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/pre-seederr/data</Config>
+</Container>

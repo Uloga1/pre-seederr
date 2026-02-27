@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pre-Seederr</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">Pre-Seederr</a>
+            <div class="navbar-nav">
+                <a class="nav-link active" href="/">Home</a>
+                <a class="nav-link" href="/settings">Settings</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        {{ if .Success }}
+        <div class="alert alert-success fw-bold">{{ .Success }}</div>
+        {{ end }}
+        {{ if .Error }}
+        <div class="alert alert-danger fw-bold">{{ .Error }}</div>
+        {{ end }}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Upload Tracker A .torrent file</label>
+                        <input class="form-control" type="file" name="torrent_file" accept=".torrent" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Find Matches</button>
+                </form>
+            </div>
+        </div>
+
+        {{ if .Name }}
+        <div class="alert alert-info">
+            <strong>Release:</strong> {{ .Name }} | <strong>Size:</strong> {{ printf "%.2f" .TargetSize }} MB
+        </div>
+
+        {{ if .Matches }}
+            <div class="table-responsive">
+                <table class="table table-striped bg-white shadow-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Tracker</th>
+                            <th>Release Name</th>
+                            <th>Size (MB)</th>
+                            <th>Diff (MB)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .Matches }}
+                        <tr>
+                            <td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
+                            <td>{{ .Title }}</td>
+                            <td>{{ printf "%.2f" .SizeMB }}</td>
+                            <td>{{ printf "%.2f" .SizeDiffMB }}</td>
+                            <td>
+                                <form action="/inject" method="POST" class="d-inline">
+                                    <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
+                                    <input type="hidden" name="torrent_data" value="{{ $.EncodedTorrentA }}">
+                                    <button type="submit" class="btn btn-sm btn-primary">Inject Both to qBit</button>
+                                </form>
+                                <a href="{{ .DownloadURL }}" class="btn btn-sm btn-outline-secondary ms-1">DL</a>
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        {{ else }}
+            <div class="alert alert-warning">No matching torrents found.</div>
+        {{ end }}
+        {{ end }}
+    </div>
+</body>
+</html>
