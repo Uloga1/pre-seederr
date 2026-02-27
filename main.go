@@ -88,7 +88,7 @@ type TorrentResult struct {
 	Name            string
 	TargetSize      float64
 	Matches         []Match
-	EncodedTorrentA string
+	EncodedTorrentA string // MUST BE THIS EXACT NAME
 	Error           string
 }
 
@@ -254,6 +254,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 			file, err := fileHeader.Open()
 			if err != nil { res.Error = "Read Error"; results = append(results, res); continue }
 			fileBytes, _ := io.ReadAll(file)
+			res.EncodedTorrentA = base64.StdEncoding.EncodeToString(fileBytes) // MUST HAVE THIS LINE
 			file.Close()
 			res.EncodedTorrentA = base64.StdEncoding.EncodeToString(fileBytes)
 			name, targetSize, err := parseTorrent(fileBytes)
