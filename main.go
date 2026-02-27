@@ -71,18 +71,29 @@ func saveConfig() error {
 	return os.WriteFile(ConfigPath, data, 0644)
 }
 
+// UPDATED: Added Seeders, Leechers, Grabs(snatches), InfoURL, and Guid
 type ProwlarrResult struct {
 	Title       string `json:"title"`
 	Indexer     string `json:"indexer"`
 	Size        int64  `json:"size"`
 	DownloadURL string `json:"downloadUrl"`
+	InfoURL     string `json:"infoUrl"`
+	Guid        string `json:"guid"`
+	Seeders     int    `json:"seeders"`
+	Leechers    int    `json:"leechers"`
+	Grabs       int    `json:"grabs"`
 }
 
+// UPDATED: Passed swarm stats and URL down to the frontend
 type Match struct {
 	Title       string
 	Indexer     string
 	SizeMB      float64
 	DownloadURL string
+	InfoURL     string
+	Seeders     int
+	Leechers    int
+	Grabs       int
 	SizeDiffMB  float64
 }
 
@@ -104,7 +115,6 @@ type PageData struct {
 }
 
 func main() {
-	// REMOVED: global http timeout. Let individual functions handle it!
 	loadConfig()
 
 	http.HandleFunc("/", handleIndex)
@@ -123,7 +133,6 @@ func qbitGetCategories() ([]string, error) {
 		return nil, err
 	}
 
-	// ADDED: 5-second specific timeout so the Home page never hangs
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -190,7 +199,6 @@ func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 func qbitLogin() (*http.Cookie, error) {
 	data := url.Values{"username": {AppConfig.QbitUser}, "password": {AppConfig.QbitPass}}
 	
-	// ADDED: 5-second specific timeout so the Home page never hangs
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	
@@ -407,7 +415,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func searchProwlarr(query string) ([]ProwlarrResult, error) {
-	// The 5-minute timeout for Prowlarr searches will now work perfectly again!
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	
@@ -447,7 +454,23 @@ func findBestMatches(results []ProwlarrResult, targetSize int64, toleranceMB flo
 		diff := res.Size - targetSize
 		if diff < 0 { diff = -diff }
 		if diff <= toleranceBytes {
-			matches = append(matches, Match{Title: res.Title, Indexer: res.Indexer, SizeMB: float64(res.Size) / (1024 * 1024), DownloadURL: res.DownloadURL, SizeDiffMB: float64(diff) / (1024 * 1024)})
+			// Fallback: If Prowlarr doesn't provide an InfoURL, sometimes it drops it in the Guid
+			infoLink := res.InfoURL
+			if infoLink == "" && strings.HasPrefix(res.Guid, "http") {
+				infoLink = res.Guid
+			}
+
+			matches = append(matches, Match{
+				Title:       res.Title,
+				Indexer:     res.Indexer,
+				SizeMB:      float64(res.Size) / (1024 * 1024),
+				DownloadURL: res.DownloadURL,
+				InfoURL:     infoLink,
+				Seeders:     res.Seeders,
+				Leechers:    res.Leechers,
+				Grabs:       res.Grabs,
+				SizeDiffMB:  float64(diff) / (1024 * 1024),
+			})
 		}
 	}
 	sort.Slice(matches, func(i, j int) bool { return matches[i].SizeDiffMB < matches[j].SizeDiffMB })

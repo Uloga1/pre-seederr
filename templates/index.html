@@ -10,6 +10,11 @@
             background: rgba(255,255,255,0.9); z-index: 9999;
             flex-direction: column; align-items: center; justify-content: center;
         }
+        /* Make clickable badges pop slightly on hover */
+        .badge-link:hover {
+            opacity: 0.8;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -62,14 +67,29 @@
                             <tr>
                                 <th class="ps-3">Tracker</th>
                                 <th>Match Name</th>
+                                <th class="text-center" title="Seeders / Leechers / Grabs">S / L / G</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {{ range .Matches }}
                             <tr>
-                                <td class="ps-3"><span class="badge bg-secondary">{{ .Indexer }}</span></td>
+                                <td class="ps-3">
+                                    {{ if .InfoURL }}
+                                        <a href="{{ .InfoURL }}" target="_blank" class="badge bg-secondary text-decoration-none badge-link" title="Open Torrent Page">{{ .Indexer }}</a>
+                                    {{ else }}
+                                        <span class="badge bg-secondary">{{ .Indexer }}</span>
+                                    {{ end }}
+                                </td>
+                                
                                 <td class="text-truncate" style="max-width: 300px;" title="{{ .Title }}">{{ .Title }}</td>
+                                
+                                <td class="text-center fw-bold">
+                                    <span class="text-success" title="{{ .Seeders }} Seeders">{{ .Seeders }}</span> /
+                                    <span class="text-danger" title="{{ .Leechers }} Leechers">{{ .Leechers }}</span> /
+                                    <span class="text-primary" title="{{ .Grabs }} Snatched/Grabs">{{ .Grabs }}</span>
+                                </td>
+
                                 <td class="pe-3">
                                     <div class="d-flex gap-2">
                                         <a href="{{ .DownloadURL }}" target="_blank" class="btn btn-sm btn-outline-secondary">Download</a>
@@ -104,12 +124,10 @@
     </div>
 
     <script>
-        // Shows the new progress bar overlay
         document.getElementById('upload-form').onsubmit = function() {
             document.getElementById('loading-overlay').style.display = 'flex';
         };
 
-        // Background Injection Logic
         document.querySelectorAll('.inject-form').forEach(form => {
             form.addEventListener('submit', async function(e) {
                 e.preventDefault(); 
