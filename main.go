@@ -161,54 +161,105 @@ func qbitLogin() (*http.Cookie, error) {
 }
 
 func qbitAddURL(cookie *http.Cookie, dlURL string, category string) error {
-	data := url.Values{"urls": {dlURL}, "savepath": {AppConfig.QbitSavePath}}
-	if category != "" { data.Set("category", category) }
+	data := url.Values{
+		"urls":     {dlURL},
+		"savepath": {AppConfig.QbitSavePath},
+	}
+	if category != "" {
+		data.Set("category", category)
+	}
+
 	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/torrents/add", strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(cookie)
+
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil { return err }
+	if err != nil { 
+		return err 
+	}
 	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("URL injection failed with status %d", resp.StatusCode)
+	}
 	return nil
 }
 
 func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string) error {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, _ := writer.CreateFormFile("torrents", "trackerA.torrent")
+
+	// Create the file part of the form
+	part, err := writer.CreateFormFile("torrents", "trackerA.torrent")
+	if err != nil {
+		return err
+	}
 	part.Write(fileBytes)
+
+	// Add the required qBittorrent fields
 	writer.WriteField("savepath", AppConfig.QbitSavePath)
-	writer.WriteField("paused", "true")
-	if AppConfig.QbitSkipChecking { writer.WriteField("skip_checking", "true") }
-	if category != "" { writer.WriteField("category", category) }
+	writer.WriteField("paused", "true") // Tracker A MUST be added paused
+
+	if AppConfig.QbitSkipChecking {
+		writer.WriteField("skip_checking", "true")
+	}
+	if category != "" {
+		writer.WriteField("category", category)
+	}
 	writer.Close()
+
 	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/torrents/add", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.AddCookie(cookie)
+
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil { return err }
+	if err != nil { 
+		return err 
+	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("File injection failed with status %d", resp.StatusCode)
+	}
 	return nil
 }
 
 func handleInject(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost { http.Redirect(w, r, "/", http.StatusSeeOther); return }
-	dlURL := r.FormValue("download_url")
-	b64Torrent := r.FormValue("torrent_data")
-	category := r.FormValue("category")
-	torrentBytes, err := base64.StdEncoding.DecodeString(b64Torrent)
-	if err != nil {
-		http.Redirect(w, r, "/?err="+url.QueryEscape("Failed to decode base64 torrent."), http.StatusSeeOther)
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
+
+	dlURL := r.FormValue("download_url")   // Tracker B (From Prowlarr)
+	b64Torrent := r.FormValue("torrent_data") // Tracker A (Your uploaded file)
+	category := r.FormValue("category")
+	
+	torrentBytes, err := base64.StdEncoding.DecodeString(b64Torrent)
+	if err != nil {
+		http.Redirect(w, r, "/?err="+url.QueryEscape("Failed to decode Tracker A."), http.StatusSeeOther)
+		return
+	}
+
 	cookie, err := qbitLogin()
 	if err != nil {
 		http.Redirect(w, r, "/?err="+url.QueryEscape("qBit Login Error: "+err.Error()), http.StatusSeeOther)
 		return
 	}
-	_ = qbitAddURL(cookie, dlURL, category)
-	_ = qbitAddFile(cookie, torrentBytes, category)
-	http.Redirect(w, r, "/?msg="+url.QueryEscape("Success! Torrents injected."), http.StatusSeeOther)
+
+	// 1. ADD TRACKER B FIRST (The active download)
+	errB := qbitAddURL(cookie, dlURL, category)
+	
+	// 2. ADD TRACKER A SECOND (The paused pre-seed)
+	errA := qbitAddFile(cookie, torrentBytes, category)
+
+	// Check if either failed and alert the user
+	if errA != nil || errB != nil {
+		errorMsg := fmt.Sprintf("Injection issue. File Error: %v | URL Error: %v", errA, errB)
+		http.Redirect(w, r, "/?err="+url.QueryEscape(errorMsg), http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/?msg="+url.QueryEscape("Success! Both trackers added to qBittorrent."), http.StatusSeeOther)
 }
 
 func handleSettings(w http.ResponseWriter, r *http.Request) {
