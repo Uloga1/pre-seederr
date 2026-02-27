@@ -84,7 +84,7 @@ type PageData struct {
 	TargetSize      float64
 	Matches         []Match
 	Config          Config
-	EncodedTorrentA string 
+	EncodedTorrentA string
 }
 
 func main() {
@@ -93,9 +93,55 @@ func main() {
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/settings", handleSettings)
 	http.HandleFunc("/inject", handleInject)
+	
+	// New Test Routes
+	http.HandleFunc("/test-prowlarr", handleTestProwlarr)
+	http.HandleFunc("/test-qbit", handleTestQbit)
 
 	fmt.Printf("[*] Go Pre-Seederr running on port %s\n", Port)
 	http.ListenAndServe(Port, nil)
+}
+
+// --- Test Connection Handlers ---
+func handleTestProwlarr(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		return
+	}
+	pURL := r.FormValue("prowlarr_url")
+	pAPI := r.FormValue("prowlarr_api_key")
+
+	// Prowlarr System Status API
+	testURL := fmt.Sprintf("%s/api/v1/system/status?apikey=%s", pURL, pAPI)
+	resp, err := http.Get(testURL)
+	if err != nil || resp.StatusCode != 200 {
+		http.Error(w, "Failed", http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleTestQbit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		return
+	}
+	qURL := r.FormValue("qbit_url")
+	qUser := r.FormValue("qbit_user")
+	qPass := r.FormValue("qbit_pass")
+
+	data := url.Values{"username": {qUser}, "password": {qPass}}
+	resp, err := http.PostForm(qURL+"/api/v2/auth/login", data)
+	if err != nil {
+		http.Error(w, "Failed", http.StatusBadRequest)
+		return
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	if string(bodyBytes) != "Ok." {
+		http.Error(w, "Failed", http.StatusUnauthorized)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // --- qBittorrent API Logic ---

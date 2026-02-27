@@ -16,41 +16,47 @@
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container pb-5">
         <h3 class="mb-4">Configuration</h3>
         
-        {{ if .Success }}<div class="alert alert-success">{{ .Success }}</div>{{ end }}
-        {{ if .Error }}<div class="alert alert-danger">{{ .Error }}</div>{{ end }}
+        {{ if .Success }}<div class="alert alert-success fw-bold">{{ .Success }}</div>{{ end }}
+        {{ if .Error }}<div class="alert alert-danger fw-bold">{{ .Error }}</div>{{ end }}
 
         <div class="card shadow-sm">
             <div class="card-body">
                 <form method="POST">
                     <div class="mb-3">
                         <label class="form-label">Prowlarr URL</label>
-                        <input type="text" class="form-control" name="prowlarr_url" value="{{ .Config.ProwlarrURL }}" required>
+                        <input type="text" class="form-control" name="prowlarr_url" id="prowlarr_url" value="{{ .Config.ProwlarrURL }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Prowlarr API Key</label>
-                        <input type="password" class="form-control" name="prowlarr_api_key" value="{{ .Config.ProwlarrAPIKey }}" required>
+                        <input type="password" class="form-control" name="prowlarr_api_key" id="prowlarr_api_key" value="{{ .Config.ProwlarrAPIKey }}" required>
+                        <button type="button" class="btn btn-sm btn-outline-info mt-2" onclick="testProwlarr()">Test Prowlarr Connection</button>
+                        <span id="prowlarr-status" class="ms-2 fw-bold"></span>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Size Tolerance (MB)</label>
                         <input type="number" step="0.1" class="form-control" name="size_tolerance_mb" value="{{ .Config.SizeToleranceMB }}" required>
                     </div>
+                    
                     <hr class="my-4">
                     <h5 class="mb-3">qBittorrent Configuration</h5>
+                    
                     <div class="mb-3">
                         <label class="form-label">qBittorrent URL</label>
-                        <input type="text" class="form-control" name="qbit_url" value="{{ .Config.QbitURL }}" required>
+                        <input type="text" class="form-control" name="qbit_url" id="qbit_url" value="{{ .Config.QbitURL }}" required>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Username</label>
-                            <input type="text" class="form-control" name="qbit_user" value="{{ .Config.QbitUser }}" required>
+                            <input type="text" class="form-control" name="qbit_user" id="qbit_user" value="{{ .Config.QbitUser }}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Password</label>
-                            <input type="password" class="form-control" name="qbit_pass" value="{{ .Config.QbitPass }}" required>
+                            <input type="password" class="form-control" name="qbit_pass" id="qbit_pass" value="{{ .Config.QbitPass }}" required>
+                            <button type="button" class="btn btn-sm btn-outline-info mt-2" onclick="testQbit()">Test qBittorrent Connection</button>
+                            <span id="qbit-status" class="ms-2 fw-bold"></span>
                         </div>
                     </div>
                     <div class="mb-4">
@@ -62,5 +68,48 @@
             </div>
         </div>
     </div>
+
+    <script>
+        async function testProwlarr() {
+            const statusLabel = document.getElementById('prowlarr-status');
+            statusLabel.innerHTML = '<span class="text-warning">Testing...</span>';
+            
+            const formData = new FormData();
+            formData.append('prowlarr_url', document.getElementById('prowlarr_url').value);
+            formData.append('prowlarr_api_key', document.getElementById('prowlarr_api_key').value);
+
+            try {
+                const response = await fetch('/test-prowlarr', { method: 'POST', body: formData });
+                if (response.ok) {
+                    statusLabel.innerHTML = '<span class="text-success">Connected Successfully!</span>';
+                } else {
+                    statusLabel.innerHTML = '<span class="text-danger">Failed. Check URL or API Key.</span>';
+                }
+            } catch (error) {
+                statusLabel.innerHTML = '<span class="text-danger">Network error reaching the app.</span>';
+            }
+        }
+
+        async function testQbit() {
+            const statusLabel = document.getElementById('qbit-status');
+            statusLabel.innerHTML = '<span class="text-warning">Testing...</span>';
+            
+            const formData = new FormData();
+            formData.append('qbit_url', document.getElementById('qbit_url').value);
+            formData.append('qbit_user', document.getElementById('qbit_user').value);
+            formData.append('qbit_pass', document.getElementById('qbit_pass').value);
+
+            try {
+                const response = await fetch('/test-qbit', { method: 'POST', body: formData });
+                if (response.ok) {
+                    statusLabel.innerHTML = '<span class="text-success">Authenticated Successfully!</span>';
+                } else {
+                    statusLabel.innerHTML = '<span class="text-danger">Failed. Check URL or Credentials.</span>';
+                }
+            } catch (error) {
+                statusLabel.innerHTML = '<span class="text-danger">Network error reaching the app.</span>';
+            }
+        }
+    </script>
 </body>
 </html>
