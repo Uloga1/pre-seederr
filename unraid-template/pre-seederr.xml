@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>Pre-Seederr</Name>
-  <Repository>ghcr.io/uloga1/pre-seederr:latest</Repository> <Registry>https://github.com/Uloga1/pre-seederr</Registry>
+  <Repository>ghcr.io/uloga1/pre-seederr:latest</Repository>
+  <Registry>https://github.com/Uloga1/pre-seederr/pkgs/container/pre-seederr</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
@@ -13,8 +14,8 @@
   </Overview>
   <Category>Downloaders: Tools:</Category>
   <WebUI>http://[IP]:[PORT:5000]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/Uloga1/pre-seederr/main/unraid/pre-seederr.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/Uloga1/pre-seederr/main/logo.png</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/Uloga1/pre-seederr/latest/unraid/pre-seederr.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/Uloga1/pre-seederr/latest/logo.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>
@@ -41,6 +42,4 @@
   </Data>
   <Environment/>
   <Labels/>
-  <Config Name="WebUI Port" Target="5000" Default="5000" Mode="tcp" Description="The port used to access the Pre-Seederr WebUI." Type="Port" Display="always" Required="true" Mask="false">5000</Config>
-  <Config Name="Appdata Config" Target="/app/data" Default="/mnt/user/appdata/pre-seederr" Mode="rw" Description="Where the configuration file is stored." Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/pre-seederr</Config>
-</Container>
+  <Config Name
