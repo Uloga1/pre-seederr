@@ -2,7 +2,8 @@ name: Build and Publish Docker Image
 
 on:
   push:
-    branches: [ "main" ]
+    # CHANGE THIS LINE TO MATCH YOUR NEW BRANCH NAME
+    branches: [ "latest" ] 
 
 jobs:
   build-and-push-image:
@@ -26,14 +27,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # We removed the metadata step completely!
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          # HARDCODED TAG HERE:
+          # Hardcoded Docker tag
           tags: ghcr.io/uloga1/pre-seederr:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
