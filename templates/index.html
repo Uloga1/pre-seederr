@@ -5,16 +5,13 @@
     <title>Pre-Seederr</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* Spinner CSS */
         #loading-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(255,255,255,0.8);
             z-index: 9999;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column; align-items: center; justify-content: center;
         }
     </style>
 </head>
@@ -65,28 +62,29 @@
                     {{ if .Matches }}
                         <div class="table-responsive">
                             <table class="table table-sm table-striped align-middle">
-                                <thead>
+                                <thead class="table-dark">
                                     <tr>
                                         <th>Tracker</th>
                                         <th>Match Name</th>
                                         <th>Size</th>
-                                        <th>Action</th>
+                                        <th style="width: 250px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {{ range .Matches }}
                                     <tr>
                                         <td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
-                                        <td class="text-truncate" style="max-width: 250px;">{{ .Title }}</td>
+                                        <td class="text-truncate" style="max-width: 250px;" title="{{ .Title }}">{{ .Title }}</td>
                                         <td>{{ printf "%.2f" .SizeMB }} MB</td>
                                         <td>
                                             <form action="/inject" method="POST" class="d-inline">
                                                 <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
                                                 <input type="hidden" name="torrent_data" value="{{ $.EncodedTorrentA }}">
+                                                
                                                 <div class="input-group input-group-sm">
                                                     {{ if $.Categories }}
                                                     <select name="category" class="form-select">
-                                                        <option value="">No Category</option>
+                                                        <option value="">Category...</option>
                                                         {{ range $.Categories }}<option value="{{ . }}">{{ . }}</option>{{ end }}
                                                     </select>
                                                     {{ end }}
@@ -109,7 +107,6 @@
     </div>
 
     <script>
-        // Show spinner on form submit
         document.getElementById('upload-form').onsubmit = function() {
             document.getElementById('loading-overlay').style.display = 'flex';
             document.getElementById('search-btn').disabled = true;
