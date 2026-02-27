@@ -32,7 +32,6 @@ type Config struct {
 	QbitURL          string  `json:"qbit_url"`
 	QbitUser         string  `json:"qbit_user"`
 	QbitPass         string  `json:"qbit_pass"`
-	QbitSavePath     string  `json:"qbit_save_path"`
 	QbitSkipChecking bool    `json:"qbit_skip_checking"`
 }
 
@@ -49,7 +48,6 @@ func loadConfig() {
 			QbitURL:          "http://192.168.1.100:8080",
 			QbitUser:         "admin",
 			QbitPass:         "adminadmin",
-			QbitSavePath:     "/downloads/pre-seeds",
 			QbitSkipChecking: false,
 		}
 		saveConfig()
@@ -165,7 +163,6 @@ func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	// FIX: We now actually USE the resp variable to check the status
 	if resp.StatusCode == 200 {
 		w.WriteHeader(http.StatusOK)
 	} else {
@@ -186,9 +183,9 @@ func qbitLogin() (*http.Cookie, error) {
 
 func qbitAddURL(cookie *http.Cookie, dlURL string, category string) error {
 	data := url.Values{
-		"urls":     {dlURL},
-		"savepath": {AppConfig.QbitSavePath},
+		"urls": {dlURL},
 	}
+	// We no longer send "savepath". We only send the category.
 	if category != "" {
 		data.Set("category", category)
 	}
@@ -215,7 +212,7 @@ func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string, isPause
 	if err != nil { return err }
 	part.Write(fileBytes)
 
-	writer.WriteField("savepath", AppConfig.QbitSavePath)
+	// We no longer send "savepath". qBit will use the category's path.
 
 	if isPaused {
 		writer.WriteField("paused", "true")
@@ -264,7 +261,6 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. PROCESS TRACKER B (Prowlarr)
 	var errB error
 	if strings.HasPrefix(dlURL, "magnet:") {
 		errB = qbitAddURL(cookie, dlURL, category)
@@ -293,7 +289,6 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 2. PROCESS TRACKER A (Uploaded Pre-seed)
 	torrentBytesA, err := base64.StdEncoding.DecodeString(b64Torrent)
 	var errA error
 	if err == nil {
@@ -302,7 +297,6 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 		errA = fmt.Errorf("Failed to decode Tracker A file.")
 	}
 
-	// 3. REPORT RESULTS
 	if errA != nil || errB != nil {
 		errorMsg := fmt.Sprintf("Injection Issue -> Tracker A: %v | Tracker B: %v", errA, errB)
 		http.Redirect(w, r, "/?err="+url.QueryEscape(errorMsg), http.StatusSeeOther)
@@ -323,7 +317,6 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		AppConfig.QbitURL = r.FormValue("qbit_url")
 		AppConfig.QbitUser = r.FormValue("qbit_user")
 		AppConfig.QbitPass = r.FormValue("qbit_pass")
-		AppConfig.QbitSavePath = r.FormValue("qbit_save_path")
 		AppConfig.QbitSkipChecking = r.FormValue("qbit_skip_checking") == "on"
 		saveConfig()
 		data.GlobalSuccess = "Settings saved!"
