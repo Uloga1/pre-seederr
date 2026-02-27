@@ -357,15 +357,30 @@ func parseTorrent(data []byte) (string, int64, error) {
 }
 
 func searchProwlarr(query string) ([]ProwlarrResult, error) {
-	url := fmt.Sprintf("%s/api/v1/search?query=%s&type=search&apikey=%s", AppConfig.ProwlarrURL, url.QueryEscape(query), AppConfig.ProwlarrAPIKey)
-	resp, err := http.Get(url)
+	// Build the URL
+	u, _ := url.Parse(AppConfig.ProwlarrURL)
+	u.Path = filepath.Join(u.Path, "/api/v1/search")
+	q := u.Query()
+	q.Set("query", query)
+	q.Set("type", "search")
+	q.Set("apikey", AppConfig.ProwlarrAPIKey)
+	u.RawQuery = q.Encode()
+
+	// Use a fresh request for every search to avoid header "bleeding"
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Explicitly use the default client to avoid any previous timeout settings
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("Prowlarr returned status %d", resp.StatusCode)
 	}
 
 	var results []ProwlarrResult
