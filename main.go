@@ -33,7 +33,6 @@ type Config struct {
 	QbitUser         string  `json:"qbit_user"`
 	QbitPass         string  `json:"qbit_pass"`
 	QbitSavePath     string  `json:"qbit_save_path"`
-	QbitCategories   string  `json:"qbit_categories"`
 	QbitSkipChecking bool    `json:"qbit_skip_checking"`
 }
 
@@ -51,7 +50,6 @@ func loadConfig() {
 			QbitUser:         "admin",
 			QbitPass:         "adminadmin",
 			QbitSavePath:     "/downloads/pre-seeds",
-			QbitCategories:   "movies, tv, music",
 			QbitSkipChecking: false,
 		}
 		saveConfig()
@@ -88,7 +86,7 @@ type TorrentResult struct {
 	Name            string
 	TargetSize      float64
 	Matches         []Match
-	EncodedTorrentA string // MUST BE THIS EXACT NAME
+	EncodedTorrentA string
 	Error           string
 }
 
@@ -113,6 +111,33 @@ func main() {
 	http.ListenAndServe(Port, nil)
 }
 
+func qbitGetCategories() ([]string, error) {
+	cookie, err := qbitLogin()
+	if err != nil {
+		return nil, err
+	}
+
+	req, _ := http.NewRequest("GET", AppConfig.QbitURL+"/api/v2/torrents/categories", nil)
+	req.AddCookie(cookie)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var cats map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&cats); err != nil {
+		return nil, err
+	}
+
+	var list []string
+	for name := range cats {
+		list = append(list, name)
+	}
+	sort.Strings(list)
+	return list, nil
+}
+
 func handleTestProwlarr(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost { return }
 	testURL := fmt.Sprintf("%s/api/v1/system/status?apikey=%s", r.FormValue("prowlarr_url"), r.FormValue("prowlarr_api_key"))
@@ -124,26 +149,15 @@ func handleTestProwlarr(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed", http.StatusBadRequest)
 		return
 	}
-	defer resp.Body.Close()
 	w.WriteHeader(http.StatusOK)
 }
 
 func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost { return }
 	data := url.Values{"username": {r.FormValue("qbit_user")}, "password": {r.FormValue("qbit_pass")}}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "POST", r.FormValue("qbit_url")+"/api/v2/auth/login", strings.NewReader(data.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.PostForm(r.FormValue("qbit_url")+"/api/v2/auth/login", data)
 	if err != nil {
 		http.Error(w, "Failed", http.StatusBadRequest)
-		return
-	}
-	defer resp.Body.Close()
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if string(bodyBytes) != "Ok." {
-		http.Error(w, "Failed", http.StatusUnauthorized)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -177,34 +191,12 @@ func qbitAddURL(cookie *http.Cookie, dlURL string, category string) error {
 	if err != nil { return err }
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK { return fmt.Errorf("URL injection failed: %d", resp.StatusCode) }
-	return nil
-}
-	data := url.Values{
-		"urls":     {dlURL},
-		"savepath": {AppConfig.QbitSavePath},
-	}
-	if category != "" {
-		data.Set("category", category)
-	}
-
-	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/torrents/add", strings.NewReader(data.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(cookie)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil { 
-		return err 
-	}
-	defer resp.Body.Close()
-	
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("URL injection failed with status %d", resp.StatusCode)
+		return fmt.Errorf("URL injection failed: %d", resp.StatusCode)
 	}
 	return nil
 }
 
-// Upgraded to handle both active/paused and skip_checking states dynamically
 func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string, isPaused bool, skipCheck bool) error {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
@@ -240,17 +232,20 @@ func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string, isPause
 	if err != nil { return err }
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK { return fmt.Errorf("File injection failed: %d", resp.StatusCode) }
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("File injection failed: %d", resp.StatusCode)
+	}
 	return nil
 }
+
 func handleInject(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
-	dlURL := r.FormValue("download_url")      // Tracker B (Prowlarr URL)
-	b64Torrent := r.FormValue("torrent_data") // Tracker A (Uploaded File)
+	dlURL := r.FormValue("download_url")
+	b64Torrent := r.FormValue("torrent_data")
 	category := r.FormValue("category")
 
 	cookie, err := qbitLogin()
@@ -259,13 +254,11 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. PROCESS TRACKER B (The Prowlarr Download)
+	// 1. PROCESS TRACKER B (Prowlarr)
 	var errB error
 	if strings.HasPrefix(dlURL, "magnet:") {
-		// If Prowlarr gave us a magnet link, send the URL directly
 		errB = qbitAddURL(cookie, dlURL, category)
 	} else {
-		// If it's a file URL, our Go app downloads it first!
 		fullURL := dlURL
 		if !strings.Contains(fullURL, "apikey=") {
 			if strings.Contains(fullURL, "?") {
@@ -277,20 +270,22 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 
 		resp, err := http.Get(fullURL)
 		if err != nil || resp.StatusCode != 200 {
-			errB = fmt.Errorf("Prowlarr download failed. Status: %d", resp.StatusCode)
+			status := 0
+			if resp != nil {
+				status = resp.StatusCode
+			}
+			errB = fmt.Errorf("Prowlarr download failed. Status: %d", status)
 		} else {
 			trackerBBytes, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			// Inject Tracker B: Active (paused=false), Normal Hash Check (skipCheck=false)
 			errB = qbitAddFile(cookie, trackerBBytes, category, false, false)
 		}
 	}
 
-	// 2. PROCESS TRACKER A (The Uploaded Pre-seed)
+	// 2. PROCESS TRACKER A (Uploaded Pre-seed)
 	torrentBytesA, err := base64.StdEncoding.DecodeString(b64Torrent)
 	var errA error
 	if err == nil {
-		// Inject Tracker A: Paused (paused=true), Skip Hash Check (depends on config)
 		errA = qbitAddFile(cookie, torrentBytesA, category, true, AppConfig.QbitSkipChecking)
 	} else {
 		errA = fmt.Errorf("Failed to decode Tracker A file.")
@@ -305,6 +300,7 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, "/?msg="+url.QueryEscape("Success! Both trackers added to qBittorrent."), http.StatusSeeOther)
 }
+
 func handleSettings(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFiles("templates/settings.html"))
 	data := PageData{Config: AppConfig}
@@ -317,7 +313,6 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		AppConfig.QbitUser = r.FormValue("qbit_user")
 		AppConfig.QbitPass = r.FormValue("qbit_pass")
 		AppConfig.QbitSavePath = r.FormValue("qbit_save_path")
-		AppConfig.QbitCategories = r.FormValue("qbit_categories")
 		AppConfig.QbitSkipChecking = r.FormValue("qbit_skip_checking") == "on"
 		saveConfig()
 		data.GlobalSuccess = "Settings saved!"
@@ -328,14 +323,11 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
-	data := PageData{}
-	var catList []string
-	if AppConfig.QbitCategories != "" {
-		for _, cat := range strings.Split(AppConfig.QbitCategories, ",") {
-			if c := strings.TrimSpace(cat); c != "" { catList = append(catList, c) }
-		}
-	}
-	data.Categories = catList
+	data := PageData{Config: AppConfig}
+
+	cats, _ := qbitGetCategories()
+	data.Categories = cats
+
 	if msg := r.URL.Query().Get("msg"); msg != "" { data.GlobalSuccess = msg }
 	if errMsg := r.URL.Query().Get("err"); errMsg != "" { data.GlobalError = errMsg }
 
@@ -346,17 +338,31 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		for _, fileHeader := range files {
 			res := TorrentResult{FileName: fileHeader.Filename}
 			file, err := fileHeader.Open()
-			if err != nil { res.Error = "Read Error"; results = append(results, res); continue }
+			if err != nil {
+				res.Error = "Read Error"
+				results = append(results, res)
+				continue
+			}
 			fileBytes, _ := io.ReadAll(file)
-			res.EncodedTorrentA = base64.StdEncoding.EncodeToString(fileBytes) // MUST HAVE THIS LINE
 			file.Close()
+
 			res.EncodedTorrentA = base64.StdEncoding.EncodeToString(fileBytes)
+
 			name, targetSize, err := parseTorrent(fileBytes)
-			if err != nil { res.Error = "Parse Error"; results = append(results, res); continue }
+			if err != nil {
+				res.Error = "Parse Error"
+				results = append(results, res)
+				continue
+			}
 			res.Name = name
 			res.TargetSize = float64(targetSize) / (1024 * 1024)
+
 			prowlarrMatches, err := searchProwlarr(name)
-			if err != nil { res.Error = err.Error(); results = append(results, res); continue }
+			if err != nil {
+				res.Error = err.Error()
+				results = append(results, res)
+				continue
+			}
 			res.Matches = findBestMatches(prowlarrMatches, targetSize, AppConfig.SizeToleranceMB)
 			results = append(results, res)
 		}
@@ -366,16 +372,13 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func searchProwlarr(query string) ([]ProwlarrResult, error) {
-	// 5 Minute timeout to prevent any local or proxy drops
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	
 	pUrl := fmt.Sprintf("%s/api/v1/search?query=%s&type=search&apikey=%s", AppConfig.ProwlarrURL, url.QueryEscape(query), AppConfig.ProwlarrAPIKey)
 	req, _ := http.NewRequestWithContext(ctx, "GET", pUrl, nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil { return nil, err }
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 { return nil, fmt.Errorf("Status %d", resp.StatusCode) }
 	var results []ProwlarrResult
 	json.NewDecoder(resp.Body).Decode(&results)
 	return results, nil
