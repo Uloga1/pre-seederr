@@ -146,21 +146,31 @@ func handleTestProwlarr(w http.ResponseWriter, r *http.Request) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", testURL, nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil || resp.StatusCode != 200 {
+		if resp != nil { resp.Body.Close() }
 		http.Error(w, "Failed", http.StatusBadRequest)
 		return
 	}
+	resp.Body.Close()
 	w.WriteHeader(http.StatusOK)
 }
 
 func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost { return }
 	data := url.Values{"username": {r.FormValue("qbit_user")}, "password": {r.FormValue("qbit_pass")}}
+	
 	resp, err := http.PostForm(r.FormValue("qbit_url")+"/api/v2/auth/login", data)
 	if err != nil {
 		http.Error(w, "Failed", http.StatusBadRequest)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	defer resp.Body.Close()
+
+	// FIX: We now actually USE the resp variable to check the status
+	if resp.StatusCode == 200 {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Error(w, "Authentication Failed", http.StatusUnauthorized)
+	}
 }
 
 func qbitLogin() (*http.Cookie, error) {
@@ -273,6 +283,7 @@ func handleInject(w http.ResponseWriter, r *http.Request) {
 			status := 0
 			if resp != nil {
 				status = resp.StatusCode
+				resp.Body.Close()
 			}
 			errB = fmt.Errorf("Prowlarr download failed. Status: %d", status)
 		} else {
