@@ -61,6 +61,12 @@
                             <input type="password" class="form-control" name="qbit_pass" value="{{ .Config.QbitPass }}" required>
                         </div>
                     </div>
+
+                    <div class="mb-3 mt-4">
+                        <label class="form-label fw-bold">Injection Tag</label>
+                        <input type="text" class="form-control" name="qbit_tag" value="{{ .Config.QbitTag }}" placeholder="pre-seed">
+                        <div class="form-text">This tag will automatically be added to injected torrents in qBittorrent.</div>
+                    </div>
                     
                     <div class="form-check mb-4 mt-4">
                         <input class="form-check-input" type="checkbox" name="qbit_skip_checking" id="skipCheck" {{ if .Config.QbitSkipChecking }}checked{{ end }}>
@@ -80,7 +86,6 @@
     </div>
 
     <script>
-        // Test Prowlarr Button Logic
         document.getElementById('test-prowlarr-btn').addEventListener('click', async function() {
             const btn = this;
             const originalText = btn.innerText;
@@ -106,7 +111,6 @@
                 btn.classList.add('text-white');
             }
 
-            // Reset button after 3 seconds
             setTimeout(() => {
                 btn.innerText = originalText;
                 btn.className = 'btn btn-outline-primary btn-sm';
@@ -114,7 +118,6 @@
             }, 3000);
         });
 
-        // Test qBittorrent Button Logic
         document.getElementById('test-qbit-btn').addEventListener('click', async function() {
             const btn = this;
             const originalText = btn.innerText;
@@ -140,7 +143,6 @@
                 btn.classList.add('text-white');
             }
 
-            // Reset button after 3 seconds
             setTimeout(() => {
                 btn.innerText = originalText;
                 btn.className = 'btn btn-outline-success btn-sm';

@@ -33,6 +33,7 @@ type Config struct {
 	QbitUser         string  `json:"qbit_user"`
 	QbitPass         string  `json:"qbit_pass"`
 	QbitSkipChecking bool    `json:"qbit_skip_checking"`
+	QbitTag          string  `json:"qbit_tag"` // NEW: Tag support
 }
 
 var AppConfig Config
@@ -49,11 +50,18 @@ func loadConfig() {
 			QbitUser:         "admin",
 			QbitPass:         "adminadmin",
 			QbitSkipChecking: false,
+			QbitTag:          "pre-seed", // Default tag
 		}
 		saveConfig()
 		return
 	}
 	json.Unmarshal(file, &AppConfig)
+	
+	// Ensure legacy configs get the default tag if it was empty
+	if AppConfig.QbitTag == "" {
+		AppConfig.QbitTag = "pre-seed"
+		saveConfig()
+	}
 }
 
 func saveConfig() error {
@@ -185,9 +193,12 @@ func qbitAddURL(cookie *http.Cookie, dlURL string, category string) error {
 	data := url.Values{
 		"urls": {dlURL},
 	}
-	// We no longer send "savepath". We only send the category.
 	if category != "" {
 		data.Set("category", category)
+	}
+	// NEW: Inject the custom tag
+	if AppConfig.QbitTag != "" {
+		data.Set("tags", AppConfig.QbitTag)
 	}
 
 	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/torrents/add", strings.NewReader(data.Encode()))
@@ -212,8 +223,6 @@ func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string, isPause
 	if err != nil { return err }
 	part.Write(fileBytes)
 
-	// We no longer send "savepath". qBit will use the category's path.
-
 	if isPaused {
 		writer.WriteField("paused", "true")
 	} else {
@@ -229,6 +238,12 @@ func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string, isPause
 	if category != "" {
 		writer.WriteField("category", category)
 	}
+	
+	// NEW: Inject the custom tag
+	if AppConfig.QbitTag != "" {
+		writer.WriteField("tags", AppConfig.QbitTag)
+	}
+	
 	writer.Close()
 
 	req, _ := http.NewRequest("POST", AppConfig.QbitURL+"/api/v2/torrents/add", body)
@@ -318,6 +333,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		AppConfig.QbitUser = r.FormValue("qbit_user")
 		AppConfig.QbitPass = r.FormValue("qbit_pass")
 		AppConfig.QbitSkipChecking = r.FormValue("qbit_skip_checking") == "on"
+		AppConfig.QbitTag = r.FormValue("qbit_tag") // NEW: Save the tag
 		saveConfig()
 		data.GlobalSuccess = "Settings saved!"
 		data.Config = AppConfig
