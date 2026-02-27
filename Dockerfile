@@ -2,15 +2,16 @@
 FROM golang:1.22-alpine AS builder
 WORKDIR /app
 
-# Copy all your code into the container
+# Install build essentials
+RUN apk add --no-cache git
+
+# Copy everything
 COPY . .
 
-# Force Docker to create fresh dependency files in the cloud
+# Force absolute fresh dependency generation
 RUN rm -f go.mod go.sum
 RUN go mod init github.com/Uloga1/pre-seederr
 RUN go mod tidy
-
-# Compile the application
 RUN go build -o pre-seederr .
 
 # Stage 2: Create the final lightweight image
