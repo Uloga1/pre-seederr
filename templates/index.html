@@ -67,9 +67,7 @@
                                 <td class="text-truncate" style="max-width: 300px;" title="{{ .Title }}">{{ .Title }}</td>
                                 <td class="pe-3">
                                     <div class="d-flex gap-2">
-                                        <a href="data:application/x-bittorrent;base64,{{ $res.EncodedTorrentA }}" 
-                                           download="{{ $res.FileName }}" 
-                                           class="btn btn-sm btn-outline-secondary">Download</a>
+                                        <a href="{{ .DownloadURL }}" target="_blank" class="btn btn-sm btn-outline-secondary">Download</a>
 
                                         <form action="/inject" method="POST" class="d-inline inject-form">
                                             <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
@@ -101,64 +99,52 @@
     </div>
 
     <script>
-        // 1. Show loading spinner on bulk search
         document.getElementById('upload-form').onsubmit = function() {
             document.getElementById('loading-overlay').style.display = 'flex';
         };
 
-        // 2. The "Magic" Background Fetch for Injections
         document.querySelectorAll('.inject-form').forEach(form => {
             form.addEventListener('submit', async function(e) {
-                e.preventDefault(); // <-- THIS stops the page from refreshing!
+                e.preventDefault(); 
                 
                 const btn = form.querySelector('.btn-inject');
-                const originalText = btn.innerHTML;
+                const originalText = "Inject Both"; // Hardcoded to ensure clean reset
                 
-                // Show a loading state on the button
                 btn.innerHTML = 'Injecting...';
                 btn.disabled = true;
+                btn.className = 'btn btn-secondary btn-inject text-nowrap';
 
                 try {
-                    // Send the data to the Go backend silently
                     const response = await fetch('/inject', {
                         method: 'POST',
                         body: new FormData(form)
                     });
                     
-                    // Check what the Go backend replied with
                     if (response.redirected) {
                         const url = new URL(response.url);
                         if (url.searchParams.has('err')) {
-                            // If it failed, turn red and show the error
                             btn.innerHTML = '❌ Failed';
-                            btn.classList.replace('btn-primary', 'btn-danger');
+                            btn.className = 'btn btn-danger btn-inject text-nowrap';
                             alert("Error: " + url.searchParams.get('err'));
-                            
-                            // Reset the button after 3 seconds so you can try again
-                            setTimeout(() => {
-                                btn.innerHTML = originalText;
-                                btn.classList.replace('btn-danger', 'btn-primary');
-                                btn.disabled = false;
-                            }, 3000);
                         } else {
-                            // If it succeeded, turn green! 
                             btn.innerHTML = '✅ Success';
-                            btn.classList.replace('btn-primary', 'btn-success');
-                            // We leave it disabled and green so you know it's done.
+                            btn.className = 'btn btn-success btn-inject text-nowrap';
                         }
                     } else {
                         btn.innerHTML = '✅ Sent';
-                        btn.classList.replace('btn-primary', 'btn-success');
+                        btn.className = 'btn btn-success btn-inject text-nowrap';
                     }
                 } catch (error) {
-                    btn.innerHTML = '❌ Network Error';
-                    btn.classList.replace('btn-primary', 'btn-danger');
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.classList.replace('btn-danger', 'btn-primary');
-                        btn.disabled = false;
-                    }, 3000);
+                    btn.innerHTML = '❌ Error';
+                    btn.className = 'btn btn-danger btn-inject text-nowrap';
                 }
+
+                // FIXED: Universally reset the button back to default after 3 seconds
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.className = 'btn btn-primary btn-inject text-nowrap'; 
+                    btn.disabled = false;
+                }, 3000);
             });
         });
     </script>
