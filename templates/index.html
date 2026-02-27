@@ -48,7 +48,49 @@
         </div>
 
         {{ range .Results }}
-        <div class="card shadow-sm mb-4 border-0">
+        {{ $res := . }} <div class="card shadow-sm mb-4 border-0">
+    <div class="card-header bg-success text-white fw-bold">
+        📄 {{ .FileName }}
+    </div>
+    <div class="card-body">
+        <div class="mb-3 text-muted small">
+            <strong>Release:</strong> {{ .Name }} | <strong>Size:</strong> {{ printf "%.2f" .TargetSize }} MB
+        </div>
+
+        {{ if .Matches }}
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Tracker</th>
+                            <th>Match Name</th>
+                            <th>Size</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .Matches }}
+                        <tr>
+                            <td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
+                            <td class="text-truncate" style="max-width: 300px;">{{ .Title }}</td>
+                            <td>{{ printf "%.2f" .SizeMB }} MB</td>
+                            <td>
+                                <form action="/inject" method="POST" class="d-inline">
+                                    <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
+                                    <input type="hidden" name="torrent_data" value="{{ $res.EncodedTorrentA }}">
+                                    <button type="submit" class="btn btn-sm btn-primary">Inject Both</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        {{ else }}
+            <div class="text-warning fw-bold">No matches found for this file.</div>
+        {{ end }}
+    </div>
+</div>
             <div class="card-header {{ if .Error }}bg-danger text-white{{ else if .Matches }}bg-success text-white{{ else }}bg-warning text-dark{{ end }} fw-bold">
                 📄 {{ .FileName }}
             </div>
