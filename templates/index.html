@@ -16,66 +16,78 @@
         </div>
     </nav>
 
-    <div class="container">
-        {{ if .Success }}
-        <div class="alert alert-success fw-bold">{{ .Success }}</div>
+    <div class="container pb-5">
+        {{ if .GlobalSuccess }}
+        <div class="alert alert-success fw-bold">{{ .GlobalSuccess }}</div>
         {{ end }}
-        {{ if .Error }}
-        <div class="alert alert-danger fw-bold">{{ .Error }}</div>
+        {{ if .GlobalError }}
+        <div class="alert alert-danger fw-bold">{{ .GlobalError }}</div>
         {{ end }}
 
         <div class="card shadow-sm mb-4">
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label class="form-label">Upload Tracker A .torrent file</label>
-                        <input class="form-control" type="file" name="torrent_file" accept=".torrent" required>
+                        <label class="form-label fw-bold">Upload Tracker A .torrent files (Bulk Supported)</label>
+                        <input class="form-control" type="file" name="torrent_files" accept=".torrent" multiple required>
+                        <div class="form-text">You can select dozens of files at once. They will be processed sequentially.</div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Find Matches</button>
+                    <button type="submit" class="btn btn-primary">Find Matches for All</button>
                 </form>
             </div>
         </div>
 
-        {{ if .Name }}
-        <div class="alert alert-info">
-            <strong>Release:</strong> {{ .Name }} | <strong>Size:</strong> {{ printf "%.2f" .TargetSize }} MB
-        </div>
-
-        {{ if .Matches }}
-            <div class="table-responsive">
-                <table class="table table-striped bg-white shadow-sm">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Tracker</th>
-                            <th>Release Name</th>
-                            <th>Size (MB)</th>
-                            <th>Diff (MB)</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{ range .Matches }}
-                        <tr>
-                            <td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
-                            <td>{{ .Title }}</td>
-                            <td>{{ printf "%.2f" .SizeMB }}</td>
-                            <td>{{ printf "%.2f" .SizeDiffMB }}</td>
-                            <td>
-                                <form action="/inject" method="POST" class="d-inline">
-                                    <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
-                                    <input type="hidden" name="torrent_data" value="{{ $.EncodedTorrentA }}">
-                                    <button type="submit" class="btn btn-sm btn-primary">Inject Both to qBit</button>
-                                </form>
-                                <a href="{{ .DownloadURL }}" class="btn btn-sm btn-outline-secondary ms-1">DL</a>
-                            </td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
+        {{ range .Results }}
+        <div class="card shadow-sm mb-4 border-0">
+            <div class="card-header {{ if .Error }}bg-danger text-white{{ else if .Matches }}bg-success text-white{{ else }}bg-warning text-dark{{ end }} fw-bold">
+                📄 {{ .FileName }}
             </div>
-        {{ else }}
-            <div class="alert alert-warning">No matching torrents found.</div>
-        {{ end }}
+            
+            <div class="card-body">
+                {{ if .Error }}
+                    <div class="text-danger fw-bold">Error: {{ .Error }}</div>
+                {{ else }}
+                    <div class="mb-3 text-muted small">
+                        <strong>Release:</strong> {{ .Name }} | <strong>Size:</strong> {{ printf "%.2f" .TargetSize }} MB
+                    </div>
+
+                    {{ if .Matches }}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Tracker</th>
+                                        <th>Match Name</th>
+                                        <th>Size</th>
+                                        <th>Diff</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {{ range .Matches }}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
+                                        <td style="max-width: 300px;" class="text-truncate" title="{{ .Title }}">{{ .Title }}</td>
+                                        <td>{{ printf "%.2f" .SizeMB }} MB</td>
+                                        <td>{{ printf "%.2f" .SizeDiffMB }} MB</td>
+                                        <td>
+                                            <form action="/inject" method="POST" class="d-inline">
+                                                <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
+                                                <input type="hidden" name="torrent_data" value="{{ $.EncodedTorrentA }}">
+                                                <button type="submit" class="btn btn-sm btn-primary">Inject Both</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {{ end }}
+                                </tbody>
+                            </table>
+                        </div>
+                    {{ else }}
+                        <div class="text-warning fw-bold">No matches found within the size tolerance.</div>
+                    {{ end }}
+                {{ end }}
+            </div>
+        </div>
         {{ end }}
     </div>
 </body>
