@@ -1,4 +1,6 @@
-# 🚀 Torrent Pre-Seeder (Reverse Cross-Seeder)
+# Pre-Seederr 🚀
+
+![Pre-Seederr Logo](logo.png)
 
 A lightweight, fully containerized web application written in Go that automates "Reverse Cross-Seeding." 
 
