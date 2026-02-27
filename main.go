@@ -33,7 +33,7 @@ type Config struct {
 	QbitUser         string  `json:"qbit_user"`
 	QbitPass         string  `json:"qbit_pass"`
 	QbitSkipChecking bool    `json:"qbit_skip_checking"`
-	QbitTag          string  `json:"qbit_tag"` // NEW: Tag support
+	QbitTag          string  `json:"qbit_tag"`
 }
 
 var AppConfig Config
@@ -50,14 +50,13 @@ func loadConfig() {
 			QbitUser:         "admin",
 			QbitPass:         "adminadmin",
 			QbitSkipChecking: false,
-			QbitTag:          "pre-seed", // Default tag
+			QbitTag:          "pre-seed",
 		}
 		saveConfig()
 		return
 	}
 	json.Unmarshal(file, &AppConfig)
 	
-	// Ensure legacy configs get the default tag if it was empty
 	if AppConfig.QbitTag == "" {
 		AppConfig.QbitTag = "pre-seed"
 		saveConfig()
@@ -105,7 +104,7 @@ type PageData struct {
 }
 
 func main() {
-	http.DefaultClient.Timeout = 5 * time.Second
+	// REMOVED: global http timeout. Let individual functions handle it!
 	loadConfig()
 
 	http.HandleFunc("/", handleIndex)
@@ -124,7 +123,11 @@ func qbitGetCategories() ([]string, error) {
 		return nil, err
 	}
 
-	req, _ := http.NewRequest("GET", AppConfig.QbitURL+"/api/v2/torrents/categories", nil)
+	// ADDED: 5-second specific timeout so the Home page never hangs
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(ctx, "GET", AppConfig.QbitURL+"/api/v2/torrents/categories", nil)
 	req.AddCookie(cookie)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -165,7 +168,12 @@ func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost { return }
 	data := url.Values{"username": {r.FormValue("qbit_user")}, "password": {r.FormValue("qbit_pass")}}
 	
-	resp, err := http.PostForm(r.FormValue("qbit_url")+"/api/v2/auth/login", data)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "POST", r.FormValue("qbit_url")+"/api/v2/auth/login", strings.NewReader(data.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		http.Error(w, "Failed", http.StatusBadRequest)
 		return
@@ -181,9 +189,18 @@ func handleTestQbit(w http.ResponseWriter, r *http.Request) {
 
 func qbitLogin() (*http.Cookie, error) {
 	data := url.Values{"username": {AppConfig.QbitUser}, "password": {AppConfig.QbitPass}}
-	resp, err := http.PostForm(AppConfig.QbitURL+"/api/v2/auth/login", data)
+	
+	// ADDED: 5-second specific timeout so the Home page never hangs
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	req, _ := http.NewRequestWithContext(ctx, "POST", AppConfig.QbitURL+"/api/v2/auth/login", strings.NewReader(data.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil { return nil, err }
 	defer resp.Body.Close()
+	
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "SID" { return cookie, nil }
 	}
@@ -197,7 +214,6 @@ func qbitAddURL(cookie *http.Cookie, dlURL string, category string) error {
 	if category != "" {
 		data.Set("category", category)
 	}
-	// NEW: Inject the custom tag
 	if AppConfig.QbitTag != "" {
 		data.Set("tags", AppConfig.QbitTag)
 	}
@@ -239,8 +255,6 @@ func qbitAddFile(cookie *http.Cookie, fileBytes []byte, category string, isPause
 	if category != "" {
 		writer.WriteField("category", category)
 	}
-	
-	// NEW: Inject the custom tag
 	if AppConfig.QbitTag != "" {
 		writer.WriteField("tags", AppConfig.QbitTag)
 	}
@@ -334,7 +348,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		AppConfig.QbitUser = r.FormValue("qbit_user")
 		AppConfig.QbitPass = r.FormValue("qbit_pass")
 		AppConfig.QbitSkipChecking = r.FormValue("qbit_skip_checking") == "on"
-		AppConfig.QbitTag = r.FormValue("qbit_tag") // NEW: Save the tag
+		AppConfig.QbitTag = r.FormValue("qbit_tag")
 		saveConfig()
 		data.GlobalSuccess = "Settings saved!"
 		data.Config = AppConfig
@@ -393,13 +407,17 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func searchProwlarr(query string) ([]ProwlarrResult, error) {
+	// The 5-minute timeout for Prowlarr searches will now work perfectly again!
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
+	
 	pUrl := fmt.Sprintf("%s/api/v1/search?query=%s&type=search&apikey=%s", AppConfig.ProwlarrURL, url.QueryEscape(query), AppConfig.ProwlarrAPIKey)
 	req, _ := http.NewRequestWithContext(ctx, "GET", pUrl, nil)
+	
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil { return nil, err }
 	defer resp.Body.Close()
+	
 	var results []ProwlarrResult
 	json.NewDecoder(resp.Body).Decode(&results)
 	return results, nil
