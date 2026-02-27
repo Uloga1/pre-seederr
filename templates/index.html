@@ -75,12 +75,27 @@
                                         <td class="text-truncate" style="max-width: 300px;" title="{{ .Title }}">{{ .Title }}</td>
                                         <td>{{ printf "%.2f" .SizeMB }} MB</td>
                                         <td>
-                                            <form action="/inject" method="POST" class="d-inline">
-                                                <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
-                                                <input type="hidden" name="torrent_data" value="{{ $res.EncodedTorrentA }}">
-                                                <button type="submit" class="btn btn-sm btn-primary">Inject Both</button>
-                                            </form>
-                                        </td>
+											<div class="d-flex gap-2">
+												<form action="data:application/x-bittorrent;base64,{{ $res.EncodedTorrentA }}" method="get">
+													<button type="submit" class="btn btn-sm btn-outline-secondary">Download .torrent</button>
+												</form>
+
+												<form action="/inject" method="POST" class="d-inline">
+													<input type="hidden" name="download_url" value="{{ .DownloadURL }}">
+													<input type="hidden" name="torrent_data" value="{{ $res.EncodedTorrentA }}">
+													
+													<div class="input-group input-group-sm">
+														{{ if $top.Categories }}
+														<select name="category" class="form-select">
+															<option value="">Category...</option>
+															{{ range $top.Categories }}<option value="{{ . }}">{{ . }}</option>{{ end }}
+														</select>
+														{{ end }}
+														<button type="submit" class="btn btn-primary">Inject Both</button>
+													</div>
+												</form>
+											</div>
+										</td>
                                     </tr>
                                     {{ end }}
                                 </tbody>
