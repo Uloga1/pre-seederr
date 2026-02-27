@@ -1,0 +1,10 @@
+# Ignore the data folder so you don't leak your API keys!
+data/
+config.json
+
+# Ignore compiled Go binaries
+preseeder
+*.exe
+
+# Ignore Go modules cache
+vendor/
