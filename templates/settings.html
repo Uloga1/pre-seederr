@@ -16,112 +16,142 @@
         </div>
     </nav>
 
-    <div class="container pb-5">
-        <h3 class="mb-4">Configuration</h3>
-        
-        {{ if .GlobalSuccess }}<div class="alert alert-success fw-bold">{{ .GlobalSuccess }}</div>{{ end }}
-        {{ if .GlobalError }}<div class="alert alert-danger fw-bold">{{ .GlobalError }}</div>{{ end }}
+    <div class="container pb-5" style="max-width: 800px;">
+        {{ if .GlobalSuccess }}
+            <div class="alert alert-success fw-bold">{{ .GlobalSuccess }}</div>
+        {{ end }}
 
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <form method="POST">
-                    <h5 class="mb-3">Prowlarr Configuration</h5>
+        <form id="settings-form" method="POST" action="/settings">
+            
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white fw-bold">Prowlarr Settings</div>
+                <div class="card-body">
                     <div class="mb-3">
-                        <label class="form-label">Prowlarr URL</label>
-                        <input type="text" class="form-control" name="prowlarr_url" id="prowlarr_url" value="{{ .Config.ProwlarrURL }}" required>
+                        <label class="form-label fw-bold">Prowlarr URL</label>
+                        <input type="text" class="form-control" name="prowlarr_url" value="{{ .Config.ProwlarrURL }}" placeholder="http://192.168.1.100:9696" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Prowlarr API Key</label>
-                        <input type="password" class="form-control" name="prowlarr_api_key" id="prowlarr_api_key" value="{{ .Config.ProwlarrAPIKey }}" required>
-                        <button type="button" class="btn btn-sm btn-outline-info mt-2" onclick="testProwlarr()">Test Prowlarr Connection</button>
-                        <span id="prowlarr-status" class="ms-2 fw-bold"></span>
+                        <label class="form-label fw-bold">API Key</label>
+                        <input type="password" class="form-control" name="prowlarr_api_key" value="{{ .Config.ProwlarrAPIKey }}" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Size Tolerance (MB)</label>
+                        <label class="form-label fw-bold">Size Tolerance (MB)</label>
                         <input type="number" step="0.1" class="form-control" name="size_tolerance_mb" value="{{ .Config.SizeToleranceMB }}" required>
+                        <div class="form-text">How much size difference is allowed when searching for matches?</div>
                     </div>
                     
-                    <hr class="my-4">
-                    <h5 class="mb-3">qBittorrent Configuration</h5>
-                    
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="test-prowlarr-btn">Test Prowlarr Connection</button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white fw-bold">qBittorrent Settings</div>
+                <div class="card-body">
                     <div class="mb-3">
-                        <label class="form-label">qBittorrent URL</label>
-                        <input type="text" class="form-control" name="qbit_url" id="qbit_url" value="{{ .Config.QbitURL }}" required>
+                        <label class="form-label fw-bold">qBittorrent URL</label>
+                        <input type="text" class="form-control" name="qbit_url" value="{{ .Config.QbitURL }}" placeholder="http://192.168.1.100:8080" required>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Username</label>
-                            <input type="text" class="form-control" name="qbit_user" id="qbit_user" value="{{ .Config.QbitUser }}" required>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Username</label>
+                            <input type="text" class="form-control" name="qbit_user" value="{{ .Config.QbitUser }}" required>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Password</label>
-                            <input type="password" class="form-control" name="qbit_pass" id="qbit_pass" value="{{ .Config.QbitPass }}" required>
-                            <button type="button" class="btn btn-sm btn-outline-info mt-2" onclick="testQbit()">Test qBittorrent Connection</button>
-                            <span id="qbit-status" class="ms-2 fw-bold"></span>
+                        <div class="col-md-6 mt-3 mt-md-0">
+                            <label class="form-label fw-bold">Password</label>
+                            <input type="password" class="form-control" name="qbit_pass" value="{{ .Config.QbitPass }}" required>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Default Save Path</label>
+                        <label class="form-label fw-bold">Save Path</label>
                         <input type="text" class="form-control" name="qbit_save_path" value="{{ .Config.QbitSavePath }}" required>
+                        <div class="form-text">The default directory where pre-seeds will be downloaded.</div>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label">Categories (Comma separated)</label>
-                        <input type="text" class="form-control" name="qbit_categories" value="{{ .Config.QbitCategories }}">
-                        <div class="form-text">e.g. movies, tv, cross-seed. These will appear as a dropdown when injecting.</div>
-                    </div>
-                    <div class="mb-4 form-check bg-white p-3 rounded border shadow-sm">
-                        <input type="checkbox" class="form-check-input ms-1" id="qbit_skip_checking" name="qbit_skip_checking" {{ if .Config.QbitSkipChecking }}checked{{ end }}>
-                        <label class="form-check-label ms-2 fw-bold" for="qbit_skip_checking">Skip Hash Check for Pre-Seeds</label>
-                        <div class="form-text ms-2 mt-1">If enabled, Tracker A will be injected in a "100% Complete" state. When Tracker B finishes downloading, simply unpause Tracker A to begin seeding instantly without verifying files.</div>
+                    
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="qbit_skip_checking" id="skipCheck" {{ if .Config.QbitSkipChecking }}checked{{ end }}>
+                        <label class="form-check-label fw-bold" for="skipCheck">
+                            Skip Hash Check on Injection (Tracker A)
+                        </label>
                     </div>
 
-                    <button type="submit" class="btn btn-success">Save Settings</button>
-                </form>
+                    <button type="button" class="btn btn-outline-success btn-sm" id="test-qbit-btn">Test qBittorrent Connection</button>
+                </div>
             </div>
-        </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-dark btn-lg">Save Settings</button>
+            </div>
+        </form>
     </div>
 
     <script>
-        async function testProwlarr() {
-            const statusLabel = document.getElementById('prowlarr-status');
-            statusLabel.innerHTML = '<span class="text-warning">Testing...</span>';
-            
-            const formData = new FormData();
-            formData.append('prowlarr_url', document.getElementById('prowlarr_url').value);
-            formData.append('prowlarr_api_key', document.getElementById('prowlarr_api_key').value);
+        // Test Prowlarr Button Logic
+        document.getElementById('test-prowlarr-btn').addEventListener('click', async function() {
+            const btn = this;
+            const originalText = btn.innerText;
+            btn.innerText = 'Testing...';
+            btn.disabled = true;
 
+            const formData = new FormData(document.getElementById('settings-form'));
+            
             try {
                 const response = await fetch('/test-prowlarr', { method: 'POST', body: formData });
                 if (response.ok) {
-                    statusLabel.innerHTML = '<span class="text-success">Connected Successfully!</span>';
+                    btn.innerText = '✅ Connection Successful';
+                    btn.classList.replace('btn-outline-primary', 'btn-success');
+                    btn.classList.add('text-white');
                 } else {
-                    statusLabel.innerHTML = '<span class="text-danger">Failed. Check URL or API Key.</span>';
+                    btn.innerText = '❌ Connection Failed';
+                    btn.classList.replace('btn-outline-primary', 'btn-danger');
+                    btn.classList.add('text-white');
                 }
-            } catch (error) {
-                statusLabel.innerHTML = '<span class="text-danger">Network error reaching the app.</span>';
+            } catch (e) {
+                btn.innerText = '❌ Network Error';
+                btn.classList.replace('btn-outline-primary', 'btn-danger');
+                btn.classList.add('text-white');
             }
-        }
 
-        async function testQbit() {
-            const statusLabel = document.getElementById('qbit-status');
-            statusLabel.innerHTML = '<span class="text-warning">Testing...</span>';
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.className = 'btn btn-outline-primary btn-sm';
+                btn.disabled = false;
+            }, 3000);
+        });
+
+        // Test qBittorrent Button Logic
+        document.getElementById('test-qbit-btn').addEventListener('click', async function() {
+            const btn = this;
+            const originalText = btn.innerText;
+            btn.innerText = 'Testing...';
+            btn.disabled = true;
+
+            const formData = new FormData(document.getElementById('settings-form'));
             
-            const formData = new FormData();
-            formData.append('qbit_url', document.getElementById('qbit_url').value);
-            formData.append('qbit_user', document.getElementById('qbit_user').value);
-            formData.append('qbit_pass', document.getElementById('qbit_pass').value);
-
             try {
                 const response = await fetch('/test-qbit', { method: 'POST', body: formData });
                 if (response.ok) {
-                    statusLabel.innerHTML = '<span class="text-success">Authenticated Successfully!</span>';
+                    btn.innerText = '✅ Connection Successful';
+                    btn.classList.replace('btn-outline-success', 'btn-success');
+                    btn.classList.add('text-white');
                 } else {
-                    statusLabel.innerHTML = '<span class="text-danger">Failed. Check URL or Credentials.</span>';
+                    btn.innerText = '❌ Connection Failed';
+                    btn.classList.replace('btn-outline-success', 'btn-danger');
+                    btn.classList.add('text-white');
                 }
-            } catch (error) {
-                statusLabel.innerHTML = '<span class="text-danger">Network error reaching the app.</span>';
+            } catch (e) {
+                btn.innerText = '❌ Network Error';
+                btn.classList.replace('btn-outline-success', 'btn-danger');
+                btn.classList.add('text-white');
             }
-        }
+
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.className = 'btn btn-outline-success btn-sm';
+                btn.disabled = false;
+            }, 3000);
+        });
     </script>
 </body>
 </html>

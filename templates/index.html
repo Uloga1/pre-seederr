@@ -44,8 +44,10 @@
             </div>
         </div>
 
-        {{ $top := . }} {{ range .Results }}
-        {{ $res := . }} <div class="card shadow-sm mb-4 border-0">
+        {{ $top := . }}
+        {{ range .Results }}
+        {{ $res := . }}
+        <div class="card shadow-sm mb-4 border-0">
             <div class="card-header bg-success text-white fw-bold">📄 {{ .FileName }}</div>
             <div class="card-body p-0">
                 {{ if .Matches }}
@@ -62,14 +64,14 @@
                             {{ range .Matches }}
                             <tr>
                                 <td class="ps-3"><span class="badge bg-secondary">{{ .Indexer }}</span></td>
-                                <td class="text-truncate" style="max-width: 300px;">{{ .Title }}</td>
+                                <td class="text-truncate" style="max-width: 300px;" title="{{ .Title }}">{{ .Title }}</td>
                                 <td class="pe-3">
                                     <div class="d-flex gap-2">
                                         <a href="data:application/x-bittorrent;base64,{{ $res.EncodedTorrentA }}" 
                                            download="{{ $res.FileName }}" 
                                            class="btn btn-sm btn-outline-secondary">Download</a>
 
-                                        <form action="/inject" method="POST" class="d-inline">
+                                        <form action="/inject" method="POST" class="d-inline inject-form">
                                             <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
                                             <input type="hidden" name="torrent_data" value="{{ $res.EncodedTorrentA }}">
                                             
@@ -80,7 +82,7 @@
                                                     {{ range $top.Categories }}<option value="{{ . }}">{{ . }}</option>{{ end }}
                                                 </select>
                                                 {{ end }}
-                                                <button type="submit" class="btn btn-primary">Inject Both</button>
+                                                <button type="submit" class="btn btn-primary btn-inject text-nowrap" style="width: 110px;">Inject Both</button>
                                             </div>
                                         </form>
                                     </div>
@@ -99,9 +101,66 @@
     </div>
 
     <script>
+        // 1. Show loading spinner on bulk search
         document.getElementById('upload-form').onsubmit = function() {
             document.getElementById('loading-overlay').style.display = 'flex';
         };
+
+        // 2. The "Magic" Background Fetch for Injections
+        document.querySelectorAll('.inject-form').forEach(form => {
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault(); // <-- THIS stops the page from refreshing!
+                
+                const btn = form.querySelector('.btn-inject');
+                const originalText = btn.innerHTML;
+                
+                // Show a loading state on the button
+                btn.innerHTML = 'Injecting...';
+                btn.disabled = true;
+
+                try {
+                    // Send the data to the Go backend silently
+                    const response = await fetch('/inject', {
+                        method: 'POST',
+                        body: new FormData(form)
+                    });
+                    
+                    // Check what the Go backend replied with
+                    if (response.redirected) {
+                        const url = new URL(response.url);
+                        if (url.searchParams.has('err')) {
+                            // If it failed, turn red and show the error
+                            btn.innerHTML = '❌ Failed';
+                            btn.classList.replace('btn-primary', 'btn-danger');
+                            alert("Error: " + url.searchParams.get('err'));
+                            
+                            // Reset the button after 3 seconds so you can try again
+                            setTimeout(() => {
+                                btn.innerHTML = originalText;
+                                btn.classList.replace('btn-danger', 'btn-primary');
+                                btn.disabled = false;
+                            }, 3000);
+                        } else {
+                            // If it succeeded, turn green! 
+                            btn.innerHTML = '✅ Success';
+                            btn.classList.replace('btn-primary', 'btn-success');
+                            // We leave it disabled and green so you know it's done.
+                        }
+                    } else {
+                        btn.innerHTML = '✅ Sent';
+                        btn.classList.replace('btn-primary', 'btn-success');
+                    }
+                } catch (error) {
+                    btn.innerHTML = '❌ Network Error';
+                    btn.classList.replace('btn-primary', 'btn-danger');
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.classList.replace('btn-danger', 'btn-primary');
+                        btn.disabled = false;
+                    }, 3000);
+                }
+            });
+        });
     </script>
 </body>
 </html>
