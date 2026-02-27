@@ -62,40 +62,31 @@
                     {{ if .Matches }}
                         <div class="table-responsive">
                             <table class="table table-sm table-striped align-middle">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>Tracker</th>
-                                        <th>Match Name</th>
-                                        <th>Size</th>
-                                        <th style="width: 250px;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {{ range .Matches }}
-                                    <tr>
-                                        <td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
-                                        <td class="text-truncate" style="max-width: 250px;" title="{{ .Title }}">{{ .Title }}</td>
-                                        <td>{{ printf "%.2f" .SizeMB }} MB</td>
-                                        <td>
-                                            <form action="/inject" method="POST" class="d-inline">
-                                                <input type="hidden" name="download_url" value="{{ .DownloadURL }}">
-                                                <input type="hidden" name="torrent_data" value="{{ $.EncodedTorrentA }}">
-                                                
-                                                <div class="input-group input-group-sm">
-                                                    {{ if $.Categories }}
-                                                    <select name="category" class="form-select">
-                                                        <option value="">Category...</option>
-                                                        {{ range $.Categories }}<option value="{{ . }}">{{ . }}</option>{{ end }}
-                                                    </select>
-                                                    {{ end }}
-                                                    <button type="submit" class="btn btn-primary">Inject Both</button>
-                                                </div>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    {{ end }}
-                                </tbody>
-                            </table>
+								<thead>
+									<tr>
+										<th>Tracker</th>
+										<th>Match Name</th>
+										<th>Size</th>
+										<th>Action</th>
+									</tr>
+								</thead>
+								<tbody>
+									{{ range .Matches }}
+									<tr>
+										<td><span class="badge bg-secondary">{{ .Indexer }}</span></td>
+										<td class="text-truncate" style="max-width: 300px;">{{ .Title }}</td>
+										<td>{{ printf "%.2f" .SizeMB }} MB</td>
+										<td>
+											<form action="/inject" method="POST" class="d-inline">
+												<input type="hidden" name="download_url" value="{{ .DownloadURL }}">
+												<input type="hidden" name="torrent_data" value="{{ $.EncodedTorrentA }}">
+												<button type="submit" class="btn btn-sm btn-primary">Inject Both</button>
+											</form>
+										</td>
+									</tr>
+									{{ end }}
+								</tbody>
+							</table>
                         </div>
                     {{ else }}
                         <div class="text-warning fw-bold">No matches found within the size tolerance.</div>
